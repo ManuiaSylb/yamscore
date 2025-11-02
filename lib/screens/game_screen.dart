@@ -80,10 +80,6 @@ class _GameScreenState extends State<GameScreen> {
     await DatabaseHelper.instance.saveYamsScores(widget.gameId, playerId, scoresData[playerId]!);
 
     if (_isPlayerDone(playerId)) {
-      final total =
-          _upperTotalFor(playerId) +
-          _lowerTotalFor(playerId) +
-          _bonusForUpper(playerId);
       await DatabaseHelper.instance.updateFinalScoreIfComplete(
         widget.gameId,
         playerId,
@@ -181,6 +177,46 @@ class _GameScreenState extends State<GameScreen> {
         return [null, 0, 50];
       default:
         return [null, 0];
+    }
+  }
+
+  // (removed _openDropdown helper; using explicit popup menu via _showOptionsMenu)
+
+  Future<void> _showOptionsMenu(
+    GlobalKey key,
+    List<int?> options,
+    int? current,
+    void Function(int?) onSelected,
+  ) async {
+    final RenderBox? renderBox =
+        key.currentContext?.findRenderObject() as RenderBox?;
+    final Offset offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+    final Size size = renderBox?.size ?? Size.zero;
+    final RelativeRect position = RelativeRect.fromLTRB(
+      offset.dx,
+      offset.dy + size.height,
+      offset.dx + size.width,
+      offset.dy,
+    );
+
+    // Use a simple index-based choice to allow `null` values to be selected and
+    // still distinguishable from dismissal.
+    final choice = await showMenu<int>(
+      context: context,
+      position: position,
+      items: List.generate(options.length, (i) {
+        final opt = options[i];
+        return PopupMenuItem<int>(
+          value: i,
+          child: Center(
+            child: Text(opt?.toString() ?? '-', textAlign: TextAlign.center),
+          ),
+        );
+      }),
+    );
+
+    if (choice != null) {
+      onSelected(options[choice]);
     }
   }
 
@@ -388,10 +424,17 @@ class _GameScreenState extends State<GameScreen> {
                                   final value = scoresData[player.id!]?[c];
                                   final options = _getOptionsFor(c);
                                   final isCompleted = value != null;
+                                  final trailingKey = GlobalKey();
                                   return Column(
                                     children: [
                                       ListTile(
                                         dense: true,
+                                        onTap: () => _showOptionsMenu(
+                                          trailingKey,
+                                          options,
+                                          value,
+                                          (v) => _updateScore(player.id!, c, v),
+                                        ),
                                         leading: _diceIconFor(c),
                                         title: Text(
                                           'Total de $c',
@@ -404,50 +447,40 @@ class _GameScreenState extends State<GameScreen> {
                                                 : FontWeight.normal,
                                           ),
                                         ),
-                                        trailing: DropdownButtonHideUnderline(
-                                          child: SizedBox(
-                                            width: 60,
-                                            child: DropdownButton<int?>(
-                                              value: value,
-                                              hint: const Text(
-                                                '-',
-                                                textAlign: TextAlign.center,
-                                              ),
-                                              isExpanded: true,
-                                              style: TextStyle(
-                                                color: isCompleted
-                                                    ? Colors.green
-                                                    : Colors.black,
-                                                fontWeight: isCompleted
-                                                    ? FontWeight.bold
-                                                    : FontWeight.normal,
-                                              ),
-                                              items: options.map((opt) {
-                                                return DropdownMenuItem<int?>(
-                                                  value: opt,
-                                                  child: SizedBox(
-                                                    width: 40,
-                                                    child: Text(
-                                                      opt?.toString() ?? '-',
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      style: TextStyle(
-                                                        color: isCompleted
-                                                            ? Colors.green
-                                                            : Colors.black,
-                                                        fontWeight: isCompleted
-                                                            ? FontWeight.bold
-                                                            : FontWeight.normal,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              }).toList(),
-                                              onChanged: (val) => _updateScore(
+                                        trailing: SizedBox(
+                                          key: trailingKey,
+                                          width: 60,
+                                          child: InkWell(
+                                            onTap: () => _showOptionsMenu(
+                                              trailingKey,
+                                              options,
+                                              value,
+                                              (v) => _updateScore(
                                                 player.id!,
                                                 c,
-                                                val,
+                                                v,
                                               ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  value?.toString() ?? '-',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    color: isCompleted
+                                                        ? Colors.green
+                                                        : Colors.black,
+                                                    fontWeight: isCompleted
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                  ),
+                                                ),
+                                                const Icon(
+                                                  Icons.arrow_drop_down,
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
@@ -514,10 +547,17 @@ class _GameScreenState extends State<GameScreen> {
                                   final value = scoresData[player.id!]?[c];
                                   final options = _getOptionsFor(c);
                                   final isCompleted = value != null;
+                                  final trailingKey = GlobalKey();
                                   return Column(
                                     children: [
                                       ListTile(
                                         dense: true,
+                                        onTap: () => _showOptionsMenu(
+                                          trailingKey,
+                                          options,
+                                          value,
+                                          (v) => _updateScore(player.id!, c, v),
+                                        ),
                                         title: Text(
                                           c,
                                           style: TextStyle(
@@ -529,50 +569,40 @@ class _GameScreenState extends State<GameScreen> {
                                                 : FontWeight.normal,
                                           ),
                                         ),
-                                        trailing: DropdownButtonHideUnderline(
-                                          child: SizedBox(
-                                            width: 60,
-                                            child: DropdownButton<int?>(
-                                              value: value,
-                                              hint: const Text(
-                                                '-',
-                                                textAlign: TextAlign.center,
-                                              ),
-                                              isExpanded: true,
-                                              style: TextStyle(
-                                                color: isCompleted
-                                                    ? Colors.green
-                                                    : Colors.black,
-                                                fontWeight: isCompleted
-                                                    ? FontWeight.bold
-                                                    : FontWeight.normal,
-                                              ),
-                                              items: options.map((opt) {
-                                                return DropdownMenuItem<int?>(
-                                                  value: opt,
-                                                  child: SizedBox(
-                                                    width: 40,
-                                                    child: Text(
-                                                      opt?.toString() ?? '-',
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      style: TextStyle(
-                                                        color: isCompleted
-                                                            ? Colors.green
-                                                            : Colors.black,
-                                                        fontWeight: isCompleted
-                                                            ? FontWeight.bold
-                                                            : FontWeight.normal,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              }).toList(),
-                                              onChanged: (val) => _updateScore(
+                                        trailing: SizedBox(
+                                          key: trailingKey,
+                                          width: 60,
+                                          child: InkWell(
+                                            onTap: () => _showOptionsMenu(
+                                              trailingKey,
+                                              options,
+                                              value,
+                                              (v) => _updateScore(
                                                 player.id!,
                                                 c,
-                                                val,
+                                                v,
                                               ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  value?.toString() ?? '-',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    color: isCompleted
+                                                        ? Colors.green
+                                                        : Colors.black,
+                                                    fontWeight: isCompleted
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                  ),
+                                                ),
+                                                const Icon(
+                                                  Icons.arrow_drop_down,
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
