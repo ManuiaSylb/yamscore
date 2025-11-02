@@ -179,10 +179,12 @@ class _SelectPlayersScreenState extends State<SelectPlayersScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Sélection des joueurs')),
-      body: Column(
+      body: SafeArea(
+        // ✅ protège des barres système
+        child: Column(
         children: [
           Expanded(
             child: ListView(
@@ -230,14 +232,20 @@ class _SelectPlayersScreenState extends State<SelectPlayersScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(
+                12,
+                12,
+                12,
+                24,
+              ), // 👈 petit padding bas
             child: ElevatedButton.icon(
               onPressed: _startGame,
               icon: const Icon(Icons.play_arrow),
               label: const Text('Démarrer la partie'),
             ),
-          )
+            ),
         ],
+      ),
       ),
     );
   }

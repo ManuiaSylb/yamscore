@@ -62,7 +62,20 @@ class _GameScreenState extends State<GameScreen> {
       scoresData[playerId] ??= {};
       scoresData[playerId]![combinaison] = score;
     });
+
     await DatabaseHelper.instance.saveYamsScores(widget.gameId, playerId, scoresData[playerId]!);
+
+    if (_isPlayerDone(playerId)) {
+      final total =
+          _upperTotalFor(playerId) +
+          _lowerTotalFor(playerId) +
+          _bonusForUpper(playerId);
+      await DatabaseHelper.instance.updateFinalScoreIfComplete(
+        widget.gameId,
+        playerId,
+      );
+    }
+
     if (widget.onScoreUpdated != null) {
       final Map<int, int?> finalScores = {};
       for (var p in scoresData.keys) {
@@ -72,10 +85,12 @@ class _GameScreenState extends State<GameScreen> {
       }
       widget.onScoreUpdated!(finalScores);
     }
+
     if (score != null) {
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) _goToNextPlayer();
     }
+
     if (_allPlayersDone()) {
       _showEndGameDialog();
     }
@@ -138,9 +153,10 @@ class _GameScreenState extends State<GameScreen> {
     }
     switch (combination) {
       case 'Brelan':
-      case 'Carré':
       case 'Chance':
         return [null, ...List.generate(26, (i) => i + 5)];
+      case 'Carré':
+        return [null, ...List.generate(26, (i) => i + 5), 40];
       case 'Full':
         return [null, 0, 25];
       case 'Petite suite':
@@ -315,183 +331,276 @@ class _GameScreenState extends State<GameScreen> {
               onPageChanged: (i) => setState(() => _currentPage = i),
               itemBuilder: (context, index) {
                 final player = players[index];
-                return Padding(
-                  padding: const EdgeInsets.all(0),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: ListView(
-                          children: [
-                            Card(
-                              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                              margin: EdgeInsets.zero,
-                              child: Column(
-                                children: [
-                                  ...upperCombos.map((c) {
-                                    final value = scoresData[player.id!]?[c];
-                                    final options = _getOptionsFor(c);
-                                    final isCompleted = value != null;
-                                    return Column(
-                                      children: [
-                                        ListTile(
-                                          dense: true,
-                                          leading: _diceIconFor(c),
-                                          title: Text(
-                                            'Total de $c',
-                                            style: TextStyle(
-                                              color: isCompleted ? Colors.green : Colors.black,
-                                              fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-                                            ),
-                                          ),
-                                          tileColor: null,
-                                          trailing: DropdownButtonHideUnderline(
-                                            child: SizedBox(
-                                              width: 60,
-                                              child: DropdownButton<int?>(
-                                                value: value,
-                                                hint: const Text('-', textAlign: TextAlign.center),
-                                                isExpanded: true,
-                                                style: TextStyle(
-                                                  color: isCompleted ? Colors.green : Colors.black,
-                                                  fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-                                                ),
-                                                items: options.map((opt) {
-                                                  return DropdownMenuItem<int?>(
-                                                    value: opt,
-                                                    child: SizedBox(
-                                                      width: 40,
-                                                      child: Text(
-                                                        opt?.toString() ?? '-',
-                                                        textAlign: TextAlign.center,
-                                                        style: TextStyle(
-                                                          color: isCompleted ? Colors.green : Colors.black,
-                                                          fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                }).toList(),
-                                                onChanged: (val) => _updateScore(player.id!, c, val),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const Divider(height: 1, thickness: 0.5),
-                                      ],
-                                    );
-                                  }),
-                                  Container(
-                                    color: const Color.fromARGB(255, 5, 94, 130),
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text('Total du haut', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                        Text('${_upperTotalFor(player.id!)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    color: const Color.fromARGB(255, 4, 73, 118),
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text('Bonus si > 62 (35 points)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                        Text('${_bonusForUpper(player.id!)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
-                                  ...lowerCombos.map((c) {
-                                    final value = scoresData[player.id!]?[c];
-                                    final options = _getOptionsFor(c);
-                                    final isCompleted = value != null;
-                                    return Column(
-                                      children: [
-                                        ListTile(
-                                          dense: true,
-                                          title: Text(
-                                            c,
-                                            style: TextStyle(
-                                              color: isCompleted ? Colors.green : Colors.black,
-                                              fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-                                            ),
-                                          ),
-                                          tileColor: null,
-                                          trailing: DropdownButtonHideUnderline(
-                                            child: SizedBox(
-                                              width: 60,
-                                              child: DropdownButton<int?>(
-                                                value: value,
-                                                hint: const Text('-', textAlign: TextAlign.center),
-                                                isExpanded: true,
-                                                style: TextStyle(
-                                                  color: isCompleted ? Colors.green : Colors.black,
-                                                  fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-                                                ),
-                                                items: options.map((opt) {
-                                                  return DropdownMenuItem<int?>(
-                                                    value: opt,
-                                                    child: SizedBox(
-                                                      width: 40,
-                                                      child: Text(
-                                                        opt?.toString() ?? '-',
-                                                        textAlign: TextAlign.center,
-                                                        style: TextStyle(
-                                                          color: isCompleted ? Colors.green : Colors.black,
-                                                          fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                }).toList(),
-                                                onChanged: (val) => _updateScore(player.id!, c, val),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const Divider(height: 1, thickness: 0.5),
-                                      ],
-                                    );
-                                  }),
-                                  Container(
-                                    color: const Color.fromARGB(255, 5, 94, 130),
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text('Total du bas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                        Text('${_lowerTotalFor(player.id!)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
-                                  FutureBuilder<int?>(
-                                    future: _getFinalScoreFromDb(player.id!),
-                                    builder: (context, snapshot) {
-                                      final dbFinal = snapshot.data;
-                                      final finalLocal = _upperTotalFor(player.id!) + _lowerTotalFor(player.id!) + _bonusForUpper(player.id!);
-                                      final showValue = dbFinal ?? finalLocal;
-                                      return Container(
-                                        color: const Color.fromARGB(255, 4, 73, 118),
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text('SCORE FINAL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                            Text('$showValue', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
+                return Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        children: [
+                          Card(
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
                             ),
-                          ],
-                        ),
+                            margin: EdgeInsets.zero,
+                            child: Column(
+                              children: [
+                                ...upperCombos.map((c) {
+                                  final value = scoresData[player.id!]?[c];
+                                  final options = _getOptionsFor(c);
+                                  final isCompleted = value != null;
+                                  return Column(
+                                    children: [
+                                      ListTile(
+                                        dense: true,
+                                        leading: _diceIconFor(c),
+                                        title: Text(
+                                          'Total de $c',
+                                          style: TextStyle(
+                                            color: isCompleted
+                                                ? Colors.green
+                                                : Colors.black,
+                                            fontWeight: isCompleted
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                        trailing: DropdownButtonHideUnderline(
+                                          child: SizedBox(
+                                            width: 60,
+                                            child: DropdownButton<int?>(
+                                              value: value,
+                                              hint: const Text(
+                                                '-',
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              isExpanded: true,
+                                              style: TextStyle(
+                                                color: isCompleted
+                                                    ? Colors.green
+                                                    : Colors.black,
+                                                fontWeight: isCompleted
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                              ),
+                                              items: options.map((opt) {
+                                                return DropdownMenuItem<int?>(
+                                                  value: opt,
+                                                  child: SizedBox(
+                                                    width: 40,
+                                                    child: Text(
+                                                      opt?.toString() ?? '-',
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      style: TextStyle(
+                                                        color: isCompleted
+                                                            ? Colors.green
+                                                            : Colors.black,
+                                                        fontWeight: isCompleted
+                                                            ? FontWeight.bold
+                                                            : FontWeight.normal,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              }).toList(),
+                                              onChanged: (val) => _updateScore(
+                                                player.id!,
+                                                c,
+                                                val,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const Divider(height: 1, thickness: 0.5),
+                                    ],
+                                  );
+                                }),
+                                Container(
+                                  color: const Color.fromARGB(255, 5, 94, 130),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 16,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Total du haut',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${_upperTotalFor(player.id!)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  color: const Color.fromARGB(255, 4, 73, 118),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 16,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Bonus si > 62 (35 points)',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${_bonusForUpper(player.id!)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ...lowerCombos.map((c) {
+                                  final value = scoresData[player.id!]?[c];
+                                  final options = _getOptionsFor(c);
+                                  final isCompleted = value != null;
+                                  return Column(
+                                    children: [
+                                      ListTile(
+                                        dense: true,
+                                        title: Text(
+                                          c,
+                                          style: TextStyle(
+                                            color: isCompleted
+                                                ? Colors.green
+                                                : Colors.black,
+                                            fontWeight: isCompleted
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                        trailing: DropdownButtonHideUnderline(
+                                          child: SizedBox(
+                                            width: 60,
+                                            child: DropdownButton<int?>(
+                                              value: value,
+                                              hint: const Text(
+                                                '-',
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              isExpanded: true,
+                                              style: TextStyle(
+                                                color: isCompleted
+                                                    ? Colors.green
+                                                    : Colors.black,
+                                                fontWeight: isCompleted
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                              ),
+                                              items: options.map((opt) {
+                                                return DropdownMenuItem<int?>(
+                                                  value: opt,
+                                                  child: SizedBox(
+                                                    width: 40,
+                                                    child: Text(
+                                                      opt?.toString() ?? '-',
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      style: TextStyle(
+                                                        color: isCompleted
+                                                            ? Colors.green
+                                                            : Colors.black,
+                                                        fontWeight: isCompleted
+                                                            ? FontWeight.bold
+                                                            : FontWeight.normal,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              }).toList(),
+                                              onChanged: (val) => _updateScore(
+                                                player.id!,
+                                                c,
+                                                val,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const Divider(height: 1, thickness: 0.5),
+                                    ],
+                                  );
+                                }),
+                                Container(
+                                  color: const Color.fromARGB(255, 5, 94, 130),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 16,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Total du bas',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${_lowerTotalFor(player.id!)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  color: const Color.fromARGB(255, 4, 73, 118),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 16,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'SCORE FINAL',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${_upperTotalFor(player.id!) + _lowerTotalFor(player.id!) + _bonusForUpper(player.id!)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 );
               },
             ),

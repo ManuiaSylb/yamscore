@@ -173,10 +173,16 @@ class DatabaseHelper {
   Future<void> updateFinalScoreIfComplete(int gameId, int playerId) async {
   final db = await instance.database;
 
-  const combinations = [
-    '1','2','3','4','5','6',
-    'Brelan','Carré','Full',
-    'Petite suite','Grande suite','Yams','Chance'
+    const upperCombos = ['1', '2', '3', '4', '5', '6'];
+    const allCombos = [
+      ...upperCombos,
+      'Brelan',
+      'Carré',
+      'Full',
+      'Petite suite',
+      'Grande suite',
+      'Yams',
+      'Chance'
   ];
 
   final countResult = await db.rawQuery('''
@@ -185,16 +191,27 @@ class DatabaseHelper {
   ''', [gameId, playerId]);
   final filledCount = countResult.first['count'] as int? ?? 0;
 
-  if (filledCount >= combinations.length) {
+    if (filledCount >= allCombos.length) {
     final totalResult = await db.rawQuery('''
       SELECT SUM(score) as total FROM yams_scores
       WHERE game_id = ? AND player_id = ?
     ''', [gameId, playerId]);
     final total = (totalResult.first['total'] ?? 0) as int;
 
+      final upperResult = await db.rawQuery(
+        '''
+      SELECT SUM(score) as upper_total FROM yams_scores
+      WHERE game_id = ? AND player_id = ? AND combinaison IN (${upperCombos.map((_) => '?').join(', ')})
+    ''',
+        [gameId, playerId, ...upperCombos],
+      );
+      final upperTotal = (upperResult.first['upper_total'] ?? 0) as int;
+
+      final finalScore = upperTotal > 62 ? total + 35 : total;
+
     await db.update(
       'game_players',
-      {'player_final_score': total},
+        {'player_final_score': finalScore},
       where: 'game_id = ? AND player_id = ?',
       whereArgs: [gameId, playerId],
     );
