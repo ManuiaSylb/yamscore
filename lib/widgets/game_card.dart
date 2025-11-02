@@ -1,4 +1,3 @@
-// GameCard.dart
 import 'package:flutter/material.dart';
 import '../models/game.dart';
 

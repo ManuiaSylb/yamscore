@@ -57,6 +57,20 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+  void _notifyFinalScores() {
+    if (widget.onScoreUpdated != null) {
+      final Map<int, int?> finalScoresMap = {};
+      for (var p in players) {
+        final total =
+            _upperTotalFor(p.id!) +
+            _lowerTotalFor(p.id!) +
+            _bonusForUpper(p.id!);
+        finalScoresMap[p.id!] = total;
+      }
+      widget.onScoreUpdated!(finalScoresMap);
+    }
+  }
+
   void _updateScore(int playerId, String combinaison, int? score) async {
     setState(() {
       scoresData[playerId] ??= {};
@@ -154,9 +168,9 @@ class _GameScreenState extends State<GameScreen> {
     switch (combination) {
       case 'Brelan':
       case 'Chance':
-        return [null, ...List.generate(26, (i) => i + 5)];
+        return [null, 0, ...List.generate(26, (i) => i + 5)];
       case 'Carré':
-        return [null, ...List.generate(26, (i) => i + 5), 40];
+        return [null, 0, ...List.generate(26, (i) => i + 5), 40];
       case 'Full':
         return [null, 0, 25];
       case 'Petite suite':
@@ -192,43 +206,70 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _showEndGameDialog() async {
-    final List<Map<String, dynamic>> results = [];
     for (var p in players) {
-      final dbFinal = await _getFinalScoreFromDb(p.id!);
-      final total = _upperTotalFor(p.id!) + _lowerTotalFor(p.id!) + _bonusForUpper(p.id!);
-      results.add({'player': p.name, 'score': dbFinal ?? total});
+      await DatabaseHelper.instance.updateFinalScoreIfComplete(
+        widget.gameId,
+        p.id!,
+      );
     }
+
+    final Map<int, int?> finalScores = {};
+    for (var p in players) {
+      final score = await _getFinalScoreFromDb(p.id!);
+      finalScores[p.id!] = score;
+    }
+
+    if (widget.onScoreUpdated != null) {
+      widget.onScoreUpdated!(finalScores);
+    }
+
+    final List<Map<String, Object>> results = players.map((p) {
+      return {
+        'player': p.name,
+        'score':
+            finalScores[p.id!] ??
+            (_upperTotalFor(p.id!) +
+                _lowerTotalFor(p.id!) +
+                _bonusForUpper(p.id!)),
+      };
+    }).toList();
+
     results.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
     if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Classement final'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: results.length,
-              itemBuilder: (context, index) {
-                final r = results[index];
-                return ListTile(
-                  leading: Text('#${index + 1}'),
-                  title: Text(r['player']),
-                  trailing: Text(r['score'].toString()),
-                );
-              },
-            ),
+      builder: (context) => AlertDialog(
+        title: const Text('Classement final'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: results.length,
+            itemBuilder: (context, index) {
+              final Map<String, Object> r = results[index];
+              final playerName = r['player'] as String;
+              final score = r['score'] as int;
+              return ListTile(
+                leading: Text('#${index + 1}'),
+                title: Text(playerName),
+                trailing: Text(score.toString()),
+              );
+            },
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Fermer'),
-            )
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pop();
+            },
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
     );
   }
 

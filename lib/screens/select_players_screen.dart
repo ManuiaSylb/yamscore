@@ -119,10 +119,8 @@ class _SelectPlayersScreenState extends State<SelectPlayersScreen> {
   final db = DatabaseHelper.instance;
   await db.insertPlayer(Player(name: name));
 
-  // Recharge la liste des joueurs
   await _loadPlayers();
 
-  // Sélectionner automatiquement le joueur ajouté
   final addedPlayer = allPlayers.firstWhere((p) => p.name == name, orElse: () => Player(id: null, name: ''));
   if (addedPlayer.id != null) {
     setState(() {
@@ -141,12 +139,10 @@ class _SelectPlayersScreenState extends State<SelectPlayersScreen> {
       return;
     }
 
-    // Convert selected players to list for reordering
     List<Player> orderedPlayers = allPlayers
         .where((p) => selectedPlayers.contains(p.id))
         .toList();
 
-    // Show reorder dialog
     final List<Player>? reorderedPlayers = await showDialog<List<Player>>(
       context: context,
       barrierDismissible: false,
@@ -155,13 +151,11 @@ class _SelectPlayersScreenState extends State<SelectPlayersScreen> {
       },
     );
 
-    if (reorderedPlayers == null) return; // Dialog cancelled
+    if (reorderedPlayers == null) return; 
 
-    // Insert the game
     int gameId = widget.game.id ??
         await DatabaseHelper.instance.insertGame(widget.game);
 
-    // Link players in their specified order
     for (int i = 0; i < reorderedPlayers.length; i++) {
       await DatabaseHelper.instance.linkPlayerToGame(
         gameId,
@@ -183,7 +177,6 @@ Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Sélection des joueurs')),
       body: SafeArea(
-        // ✅ protège des barres système
         child: Column(
         children: [
           Expanded(
@@ -237,7 +230,7 @@ Widget build(BuildContext context) {
                 12,
                 12,
                 24,
-              ), // 👈 petit padding bas
+              ), 
             child: ElevatedButton.icon(
               onPressed: _startGame,
               icon: const Icon(Icons.play_arrow),

@@ -38,18 +38,26 @@ class _HomeScreenState extends State<HomeScreen> {
     final allPlayers = await DatabaseHelper.instance.getAllPlayers();
 
     for (var game in data) {
-      final finalScoresData = await DatabaseHelper.instance.getFinalScores(game.id!);
+      final finalScoresData = await DatabaseHelper.instance.getFinalScores(
+        game.id!,
+      );
       final Map<String, int?> finalScores = {};
+
       for (var playerName in game.players) {
         final playerObj = allPlayers.firstWhere(
           (p) => p.name == playerName,
           orElse: () => Player(id: -1, name: ''),
         );
+
         finalScores[playerName] =
-            playerObj.id != -1 ? finalScoresData[playerObj.id] ?? null : null;
+          playerObj.id != -1
+            ? finalScoresData[playerObj.id]
+            : null;
       }
+
       game.finalScores = finalScores;
     }
+
     setState(() => games = data);
   }
 
@@ -67,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ).then((_) => _loadGames());
   }
 
-  void _openGame(Game game) {
+  _openGame(Game game) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -77,11 +85,12 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               for (var playerName in game.players) {
                 final playerId = updatedScores.keys.firstWhere(
-                  (id) => updatedScores[id] != null,
+                  (id) => id != null,
                   orElse: () => -1,
                 );
-                game.finalScores[playerName] =
-                    playerId != -1 ? updatedScores[playerId] : null;
+                game.finalScores[playerName] = playerId != -1
+                    ? updatedScores[playerId]
+                    : null;
               }
             });
           },
